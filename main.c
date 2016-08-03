@@ -35,7 +35,10 @@ static void usage(FILE *stream, int exit_code) {
 	    "   -g  --group <group>    Group to drop privs to; defaults to '%s'.\n"
 	    "   -d  --daemon           Become a daemon.\n"
 	    "   -t  --delay <#>        Seconds to delay between auth attempts; default %ds.\n"
-	    "   -c  --chroot <dir>     Run in a chroot environment.\n", LISTENADDRESS, DEFAULTPORT, RSA_KEYFILE, LOGFILE, USER, GROUP, DELAY ); 
+	    "   -c  --chroot <dir>     Run in a chroot environment.\n"
+	    "   -b  --banner <banner>  SSH Banner; defaults to '%s'.\n", LISTENADDRESS, DEFAULTPORT, RSA_KEYFILE, LOGFILE, USER, GROUP, DELAY, BANNER ); 
+
+
     exit(exit_code);
 }
 
@@ -92,9 +95,9 @@ int main(int argc, char *argv[]) {
     char *user = USER; 
     char *group = GROUP; 
     char *listen = LISTENADDRESS; 
+    char *banner = BANNER; 
 
     char *chroot = NULL; 
-
 
     bool syslog_bool = 0; 
     bool chroot_bool = 0; 
@@ -102,7 +105,7 @@ int main(int argc, char *argv[]) {
 
     /* Handle command line options. */
     int next_opt = 0;
-    const char *short_opts = "c:g:u:l:L:r:p:hsd";
+    const char *short_opts = "b:c:g:u:l:L:r:p:hsd";
     const struct option long_opts[] = {
         { "help",    no_argument, NULL, 'h' },
 	{ "daemon",  no_argument, NULL, 'd' }, 
@@ -115,6 +118,7 @@ int main(int argc, char *argv[]) {
 	{ "delay",   required_argument, NULL, 't' }, 
 	{ "chroot",  required_argument, NULL, 'c' }, 
 	{ "listen",  required_argument, NULL, 'l' }, 
+        { "banner",  required_argument, NULL, 'b' }, 
         { NULL,      0, NULL, 0   }
     };
 
@@ -155,6 +159,10 @@ int main(int argc, char *argv[]) {
 	    case 'g':
 		group = optarg; 
 		break; 
+
+	    case 'b': 
+		banner = optarg; 
+		break;
 
 	    case 'd': 
 		daemon_bool = 1; 
@@ -199,6 +207,8 @@ int main(int argc, char *argv[]) {
     ssh_bind_options_set(sshbind, SSH_BIND_OPTIONS_BINDPORT, &port);
     ssh_bind_options_set(sshbind, SSH_BIND_OPTIONS_HOSTKEY, "ssh-rsa");
     ssh_bind_options_set(sshbind, SSH_BIND_OPTIONS_RSAKEY,rsa_keyfile);
+    ssh_bind_options_set(sshbind, SSH_BIND_OPTIONS_BANNER, banner);
+
 
     /* Listen on `port' for connections. */
     if (ssh_bind_listen(sshbind) < 0) {
