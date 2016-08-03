@@ -25,10 +25,19 @@ Installation:
 
 Usage:
 
-    sshpot [-h] [-p <port>]
-        -h  --help          Display this usage information.
-        -p  --port <port>   Port to listen on; defaults to 22.
+    sshpot [-h]
 
+        -h  --help             Display this usage information.
+        -l  --listen {addr}    Listen address; defaults to 0.0.0.0.
+        -p  --port <port>      Port to listen on; defaults to 22.
+        -r  --rsa <file>       RSA Key file; defaults to ./sshpot.rsa.key.
+        -L  --logfile <file>   Output log file; defaults to sshpot_auth.log
+        -s  --syslog           Log output to syslog.
+        -u  --user <username>  Username to drop privs to; defaults to 'nobody'.
+        -g  --group <group>    Group to drop privs to; defaults to 'nogroup'.
+        -d  --daemon           Become a daemon.
+        -t  --delay <#>        Seconds to delay between auth attempts; default 2s.
+        -c  --chroot <dir>     Run in a chroot environment.
 
 Dependencies:
 

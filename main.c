@@ -10,9 +10,11 @@
 #include <getopt.h>
 #include <errno.h>
 #include <sys/wait.h>
+#include <stdbool.h>
 
 #define MINPORT 0
 #define MAXPORT 65535
+
 
 /* Global so they can be cleaned up at SIGINT. */
 static ssh_session session;
@@ -21,10 +23,19 @@ static ssh_bind sshbind;
 
 /* Print usage information to `stream', exit with `exit_code'. */
 static void usage(FILE *stream, int exit_code) {
-    fprintf(stream, "Usage: sshpot [-h] [-p <port>]\n");
+    fprintf(stream, "Usage: sshpot [-h]\n");
     fprintf(stream,
-            "   -h  --help          Display this usage information.\n"
-            "   -p  --port <port>   Port to listen on; defaults to 22.\n");
+            "   -h  --help             Display this usage information.\n"
+	    "   -l  --listen {addr}    Listen address; defaults to %s.\n"
+            "   -p  --port <port>      Port to listen on; defaults to %d.\n"
+            "   -r  --rsa <file>       RSA Key file; defaults to %s.\n" 
+            "   -L  --logfile <file>   Output log file; defaults to %s\n"
+	    "   -s  --syslog           Log output to syslog.\n"
+	    "   -u  --user <username>  Username to drop privs to; defaults to '%s'.\n"
+	    "   -g  --group <group>    Group to drop privs to; defaults to '%s'.\n"
+	    "   -d  --daemon           Become a daemon.\n"
+	    "   -t  --delay <#>        Seconds to delay between auth attempts; default %ds.\n"
+	    "   -c  --chroot <dir>     Run in a chroot environment.\n", LISTENADDRESS, DEFAULTPORT, RSA_KEYFILE, LOGFILE, USER, GROUP, DELAY ); 
     exit(exit_code);
 }
 
@@ -72,15 +83,39 @@ static void wrapup(void) {
 
 
 int main(int argc, char *argv[]) {
+
     int port = DEFAULTPORT;
+    int delay = DELAY; 
+
+    char *rsa_keyfile = RSA_KEYFILE; 
+    char *logfile = LOGFILE;
+    char *user = USER; 
+    char *group = GROUP; 
+    char *listen = LISTENADDRESS; 
+
+    char *chroot = NULL; 
+
+
+    bool syslog_bool = 0; 
+    bool chroot_bool = 0; 
+    bool daemon_bool = 0; 
 
     /* Handle command line options. */
     int next_opt = 0;
-    const char *short_opts = "hp:";
+    const char *short_opts = "c:g:u:l:L:r:p:hsd";
     const struct option long_opts[] = {
-        { "help",   0, NULL, 'h' },
-        { "port",   1, NULL, 'p' },
-        { NULL,     0, NULL, 0   }
+        { "help",    no_argument, NULL, 'h' },
+	{ "daemon",  no_argument, NULL, 'd' }, 
+        { "port",    required_argument, NULL, 'p' },
+        { "rsa",     required_argument, NULL, 'r' }, 
+        { "logfile", required_argument, NULL, 'L' }, 
+        { "syslog",  required_argument, NULL, 's' }, 
+	{ "user",    required_argument, NULL, 'u' }, 
+	{ "group",   required_argument, NULL, 'g' }, 
+	{ "delay",   required_argument, NULL, 't' }, 
+	{ "chroot",  required_argument, NULL, 'c' }, 
+	{ "listen",  required_argument, NULL, 'l' }, 
+        { NULL,      0, NULL, 0   }
     };
 
     while (next_opt != -1) {
@@ -97,9 +132,46 @@ int main(int argc, char *argv[]) {
                 }
                 break;
 
+	    case 'r':
+	        rsa_keyfile = optarg; 
+		break;
+
+	    case 'L':
+		logfile = optarg; 
+		break;
+
+	    case 'l':
+	        listen = optarg; 
+		break;
+   
+            case 's':
+		syslog_bool = 1; 
+		break;
+
+	    case 'u':
+		user = optarg; 
+		break;
+
+	    case 'g':
+		group = optarg; 
+		break; 
+
+	    case 'd': 
+		daemon_bool = 1; 
+		break;
+
+	    case 't': 
+		delay = atoi(optarg); 
+		break;
+
             case '?':
                 usage(stderr, 1);
                 break;
+
+	    case 'c': 
+		chroot_bool = true; 
+		chroot = optarg; 
+		break;
 
             case -1:
                 break;
@@ -123,17 +195,43 @@ int main(int argc, char *argv[]) {
     /* Create and configure the ssh session. */
     session=ssh_new();
     sshbind=ssh_bind_new();
-    ssh_bind_options_set(sshbind, SSH_BIND_OPTIONS_BINDADDR, LISTENADDRESS);
+    ssh_bind_options_set(sshbind, SSH_BIND_OPTIONS_BINDADDR, listen);
     ssh_bind_options_set(sshbind, SSH_BIND_OPTIONS_BINDPORT, &port);
     ssh_bind_options_set(sshbind, SSH_BIND_OPTIONS_HOSTKEY, "ssh-rsa");
-    ssh_bind_options_set(sshbind, SSH_BIND_OPTIONS_RSAKEY,RSA_KEYFILE);
+    ssh_bind_options_set(sshbind, SSH_BIND_OPTIONS_RSAKEY,rsa_keyfile);
 
     /* Listen on `port' for connections. */
     if (ssh_bind_listen(sshbind) < 0) {
         printf("Error listening to socket: %s\n",ssh_get_error(sshbind));
         return -1;
     }
-    if (DEBUG) { printf("Listening on port %d.\n", port); }
+
+    printf("Listening on port %s:%d.\n", listen, port);
+
+    /* Chroot has to happen before drop_priv! */
+    if (chroot_bool) { 
+        sshpot_chroot(chroot); 
+	}
+
+    /* Drop to non-root user please */
+    drop_priv(user, group);
+
+    /* Become a deamon,  if the user wants */
+    if (daemon_bool) { 
+
+	printf("Becoming a daemon!\n"); 
+
+	pid_t pid = 0;
+	setsid();
+	pid = fork();
+
+	if (pid == 0) {}
+	else
+                {
+                    exit(0);
+                }
+	
+	}
 
     /* Loop forever, waiting for and handling connection attempts. */
     while (1) {
@@ -149,7 +247,7 @@ int main(int argc, char *argv[]) {
                 exit(-1);
 
             case 0:
-                exit(handle_auth(session));
+                exit(handle_auth(session, logfile, syslog_bool, delay));
 
             default:
                 break;
