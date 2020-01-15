@@ -105,14 +105,14 @@ int main(int argc, char *argv[]) {
 
     /* Handle command line options. */
     int next_opt = 0;
-    const char *short_opts = "b:c:g:u:l:L:r:p:hsd";
+    const char *short_opts = "L:b:c:g:u:l:L:r:p:hsd";
     const struct option long_opts[] = {
         { "help",    no_argument, NULL, 'h' },
 	{ "daemon",  no_argument, NULL, 'd' }, 
+        { "syslog",  no_argument, NULL, 's' },
         { "port",    required_argument, NULL, 'p' },
         { "rsa",     required_argument, NULL, 'r' }, 
         { "logfile", required_argument, NULL, 'L' }, 
-        { "syslog",  required_argument, NULL, 's' }, 
 	{ "user",    required_argument, NULL, 'u' }, 
 	{ "group",   required_argument, NULL, 'g' }, 
 	{ "delay",   required_argument, NULL, 't' }, 
